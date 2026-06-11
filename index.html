@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>포켓몬 월드</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0e1a; font-family: 'Trebuchet MS', sans-serif; }
+  #app { width: 100%; height: 100%; position: relative; }
+  canvas { display: block; }
+
+  /* ===== 로딩 화면 ===== */
+  #loading {
+    position: absolute; inset: 0; z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 40%, #1a2340, #0b0e1a);
+    color: #fff; transition: opacity .6s;
+  }
+  #loading h1 { font-size: 2.4rem; letter-spacing: 2px; margin-bottom: 1.5rem; text-shadow: 0 0 18px #ffcb05; color: #ffcb05; }
+  #bar-wrap { width: 340px; height: 18px; background: #11162b; border: 2px solid #3a4a7a; border-radius: 10px; overflow: hidden; }
+  #bar { width: 0%; height: 100%; background: linear-gradient(90deg, #ffcb05, #ff9d00); transition: width .25s; }
+  #load-text { margin-top: .8rem; font-size: 1rem; color: #aab4d8; }
+
+  /* ===== 선택 화면 ===== */
+  #selection {
+    position: absolute; inset: 0; z-index: 40;
+    display: none; flex-direction: column; align-items: center;
+    background: radial-gradient(circle at 50% 0%, #1a2340, #0b0e1a);
+    color: #fff; padding: 2rem; overflow-y: auto;
+  }
+  #selection h2 { font-size: 2rem; color: #ffcb05; margin-bottom: .3rem; text-shadow: 0 0 14px #ffcb0566; }
+  #selection p.sub { color: #8b97c2; margin-bottom: 1.6rem; }
+  #grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-width: 880px; width: 100%; }
+  .card {
+    background: linear-gradient(160deg, #1c2444, #141a30);
+    border: 2px solid #2c3a66; border-radius: 14px; padding: 12px;
+    display: flex; flex-direction: column; align-items: center; cursor: pointer;
+    transition: transform .15s, border-color .15s, box-shadow .15s;
+  }
+  .card:hover { transform: translateY(-6px) scale(1.03); border-color: #ffcb05; box-shadow: 0 8px 26px #ffcb0533; }
+  .card.selected { border-color: #ff5a5a; box-shadow: 0 0 24px #ff5a5a66; }
+  .card .preview { width: 100%; aspect-ratio: 1; border-radius: 10px; background: #0d1226; margin-bottom: 8px; }
+  .card .nm { font-size: 1.05rem; font-weight: bold; }
+  .card .tp { font-size: .75rem; color: #8b97c2; margin-top: 2px; }
+  #start-btn {
+    margin-top: 1.8rem; padding: .9rem 2.6rem; font-size: 1.1rem; font-weight: bold;
+    background: linear-gradient(90deg, #ffcb05, #ff9d00); color: #1a1300; border: none;
+    border-radius: 30px; cursor: pointer; opacity: .4; pointer-events: none; transition: opacity .2s, transform .1s;
+  }
+  #start-btn.ready { opacity: 1; pointer-events: auto; }
+  #start-btn.ready:hover { transform: scale(1.05); }
+
+  /* ===== 페이드 ===== */
+  #fade { position: absolute; inset: 0; z-index: 60; background: #000; opacity: 0; pointer-events: none; transition: opacity .6s; }
+  #fade.show { opacity: 1; }
+
+  /* ===== 게임 HUD ===== */
+  #hud {
+    position: absolute; left: 14px; bottom: 14px; z-index: 20; color: #fff;
+    background: #0b0e1aaa; padding: 10px 14px; border-radius: 10px; border: 1px solid #2c3a66;
+    font-size: .85rem; line-height: 1.5; display: none;
+  }
+  #hud b { color: #ffcb05; }
+
+  /* 미니맵 */
+  #minimap-wrap {
+    position: absolute; right: 14px; bottom: 14px; z-index: 25; display: none;
+    background: #0b0e1acc; border: 1px solid #2c3a66; border-radius: 10px; padding: 8px;
+  }
+  #minimap-title { color: #ffcb05; font-size: .7rem; letter-spacing: 2px; margin-bottom: 4px; text-align: center; }
+  #minimap { display: block; border-radius: 6px; background: #0d1226; }
+
+  /* NPC 라벨 (CSS2D) */
+  .npc-label {
+    color: #fff; background: #0b0e1acc; padding: 2px 8px; border-radius: 8px;
+    font-size: 12px; border: 1px solid #3a4a7a; white-space: nowrap; pointer-events: none;
+  }
+  /* NPC 클릭 팝업 */
+  #npc-popup {
+    position: absolute; z-index: 30; display: none; transform: translate(-50%, -120%);
+    background: linear-gradient(160deg, #1c2444, #141a30); border: 2px solid #ffcb05;
+    border-radius: 12px; padding: 10px 16px; color: #fff; text-align: center; pointer-events: none;
+  }
+  #npc-popup .pn { font-size: 1.1rem; font-weight: bold; color: #ffcb05; }
+  #npc-popup .pt { font-size: .8rem; color: #aab4d8; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div id="loading">
+      <h1>포켓몬 월드</h1>
+      <div id="bar-wrap"><div id="bar"></div></div>
+      <div id="load-text">로딩중... 0/12</div>
+    </div>
+
+    <div id="selection">
+      <h2>파트너를 선택하세요</h2>
+      <p class="sub">함께 모험할 포켓몬을 고르세요</p>
+      <div id="grid"></div>
+      <button id="start-btn">모험 시작</button>
+    </div>
+
+    <div id="hud">
+      <div><b>방향키</b> 이동 · <b>마우스 드래그</b> 카메라</div>
+      <div>파트너: <b id="hud-name">-</b></div>
+    </div>
+
+    <div id="minimap-wrap">
+      <div id="minimap-title">MAP</div>
+      <canvas id="minimap" width="170" height="170"></canvas>
+    </div>
+
+    <div id="npc-popup"><div class="pn"></div><div class="pt"></div></div>
+    <div id="fade"></div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
