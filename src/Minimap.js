@@ -8,9 +8,10 @@ export class Minimap {
     this.half = map.size / 2; // 월드 반경
   }
 
-  // 월드(x,z) → 캔버스(px). z+ 가 화면 위로.
+  // 월드(x,z) → 캔버스(px). 게임 기본 카메라뷰와 일치:
+  // 카메라가 +z서 -z 바라봄 → 화면 좌측=x+, 화면 위=z+.
   _p(x, z) {
-    const px = (x / this.half) * 0.5 + 0.5;
+    const px = (-x / this.half) * 0.5 + 0.5;
     const pz = (-z / this.half) * 0.5 + 0.5;
     return [px * this.w, pz * this.h];
   }
